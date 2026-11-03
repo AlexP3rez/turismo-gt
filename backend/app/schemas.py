@@ -103,3 +103,30 @@ class ServiceUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=100)
     description: Optional[str] = None
     is_active: Optional[bool] = None
+
+# ---------- Chat (Fase 4) ----------
+class ChatIn(BaseModel):
+    message: str = Field(min_length=1, max_length=1000)
+    conversation_id: Optional[int] = None  # vacío = conversación nueva
+
+
+class SourceOut(BaseModel):
+    id: int
+    destination_id: Optional[int] = None
+    title: str
+    score: float
+
+
+class UsageOut(BaseModel):
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+
+
+class ChatOut(BaseModel):
+    conversation_id: int
+    answer: str
+    sources: list[SourceOut]
+    sufficient_info: bool
+    usage: UsageOut
+    tokens_remaining: int

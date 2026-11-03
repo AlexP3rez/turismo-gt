@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     database_url: str
     groq_api_key: str = ""
     gemini_api_key: str = ""
+    groq_model: str = "openai/gpt-oss-120b"
     jwt_secret: str = "810144f3f2fcbcfe7c918030b79be1b262b3bd5dfabc38e9f3c367f227f638d6"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 120
