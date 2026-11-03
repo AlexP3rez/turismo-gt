@@ -1,8 +1,10 @@
 from datetime import datetime
+from typing import Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
 
+# ---------- Autenticación (Fase 2) ----------
 class RegisterIn(BaseModel):
     email: EmailStr
     full_name: str = Field(min_length=2, max_length=150)
@@ -24,3 +26,80 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserOut
+
+
+# ---------- Usuarios (admin) ----------
+class UserCreate(BaseModel):
+    email: EmailStr
+    full_name: str = Field(min_length=2, max_length=150)
+    password: str = Field(min_length=8, max_length=72)
+    role: Literal["admin", "user"] = "user"
+    token_limit: int = Field(20000, ge=0)
+
+
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    full_name: Optional[str] = Field(None, min_length=2, max_length=150)
+    password: Optional[str] = Field(None, min_length=8, max_length=72)
+    role: Optional[Literal["admin", "user"]] = None
+    token_limit: Optional[int] = Field(None, ge=0)
+    is_active: Optional[bool] = None
+
+
+# ---------- Destinos y actividades ----------
+class DestinationIn(BaseModel):
+    name: str = Field(min_length=2, max_length=150)
+    department: str = Field(min_length=2, max_length=80)
+    category: str = Field(min_length=2, max_length=50)
+    description: str = Field(min_length=20)
+
+
+class DestinationOut(DestinationIn):
+    id: int
+    created_at: datetime
+
+
+class DestinationSaved(DestinationOut):
+    indexed: bool  # True si los fragmentos del RAG quedaron actualizados
+
+
+class ActivityBase(BaseModel):
+    name: str = Field(min_length=2, max_length=150)
+    description: Optional[str] = None
+    category: str = Field(min_length=2, max_length=50)
+    est_cost_gtq: float = Field(0, ge=0, le=99999999)
+    duration_hours: float = Field(2, gt=0, lt=100)
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+
+
+class ActivityCreate(ActivityBase):
+    destination_id: int
+
+
+class ActivityOut(ActivityBase):
+    id: int
+    destination_id: int
+
+
+class ActivitySaved(ActivityOut):
+    indexed: bool
+
+
+class DestinationDetail(DestinationOut):
+    activities: list[ActivityOut] = []
+
+
+# ---------- Servicios de IA ----------
+class ServiceOut(BaseModel):
+    id: int
+    code: str
+    name: str
+    description: Optional[str] = None
+    is_active: bool
+
+
+class ServiceUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=100)
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
