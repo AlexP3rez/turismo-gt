@@ -130,3 +130,27 @@ class ChatOut(BaseModel):
     sufficient_info: bool
     usage: UsageOut
     tokens_remaining: int
+
+# ---------- Agentes (Fase 5) ----------
+class AgentIn(BaseModel):
+    message: str = Field(min_length=5, max_length=1000)
+
+
+class AdjustIn(BaseModel):
+    plan: str = Field(min_length=20, max_length=8000)    # plan actual (texto)
+    change: str = Field(min_length=3, max_length=500)    # cambio de presupuesto o clima
+
+
+class StepOut(BaseModel):
+    step: int
+    tool: str
+    arguments: dict
+    result: str
+
+
+class AgentOut(BaseModel):
+    conversation_id: int
+    answer: str
+    steps: list[StepOut]
+    usage: UsageOut
+    tokens_remaining: int

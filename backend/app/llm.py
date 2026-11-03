@@ -21,8 +21,9 @@ def _get_client() -> Groq:
 
 
 def chat(messages: list[dict], tools: list[dict] | None = None,
-         temperature: float = 0.2, max_tokens: int = 1500):
-    """Una llamada al modelo. `tools` se usa en la Fase 5 (agentes)."""
+         temperature: float = 0.2, max_tokens: int = 1500,
+         tool_choice: str = "auto"):
+    """Una llamada al modelo. `tools` y `tool_choice` se usan en los agentes."""
     kwargs = {
         "model": settings.groq_model,
         "messages": messages,
@@ -30,11 +31,10 @@ def chat(messages: list[dict], tools: list[dict] | None = None,
         "max_tokens": max_tokens,
     }
     if "gpt-oss" in settings.groq_model:
-        # Menos razonamiento = respuestas más rápidas y menos tokens consumidos
         kwargs["extra_body"] = {"reasoning_effort": "low"}
     if tools:
         kwargs["tools"] = tools
-        kwargs["tool_choice"] = "auto"
+        kwargs["tool_choice"] = tool_choice
     try:
         return _get_client().chat.completions.create(**kwargs)
     except groq.APIError as e:

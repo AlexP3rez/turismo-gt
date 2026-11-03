@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from psycopg.types.json import Jsonb
 
-from .. import knowledge, llm, rag
+from .. import agents, knowledge, llm, rag
 from ..ai_gateway import ensure_can_run, record_usage
 from ..database import get_conn
 from ..deps import get_current_user
-from ..schemas import ChatIn, ChatOut
+from ..schemas import AdjustIn, AgentIn, AgentOut, ChatIn, ChatOut
 
 router = APIRouter(prefix="/ai", tags=["Servicios de IA"])
 
@@ -73,3 +73,58 @@ def chat(data: ChatIn, user: dict = Depends(get_current_user), conn=Depends(get_
         "usage": result["usage"],
         "tokens_remaining": remaining,
     }
+
+# ======================= AGENTES (Fase 5) =======================
+def run_agent_service(conn, user: dict, service_code: str, title: str,
+                      user_text: str, system_prompt: str) -> dict:
+    """Flujo común de los agentes: verificar -> ejecutar -> guardar -> registrar consumo."""
+    service = ensure_can_run(conn, user, service_code)
+
+    try:
+        result = agents.run_agent(conn, system_prompt, user_text)
+    except llm.LLMError as e:
+        raise HTTPException(502, f"El servicio de IA no está disponible: {e}")
+
+    conversation_id = conn.execute(
+        """INSERT INTO conversations (user_id, service_id, title)
+           VALUES (%s, %s, %s) RETURNING id""",
+        (user["id"], service["id"], title[:60]),
+    ).fetchone()["id"]
+    conn.execute(
+        "INSERT INTO messages (conversation_id, role, content) VALUES (%s, 'user', %s)",
+        (conversation_id, user_text),
+    )
+    conn.execute(
+        """INSERT INTO messages (conversation_id, role, content, steps)
+           VALUES (%s, 'assistant', %s, %s)""",
+        (conversation_id, result["answer"], Jsonb(result["steps"])),
+    )
+    remaining = record_usage(conn, user["id"], service["id"], conversation_id, result["usage"])
+    conn.commit()
+
+    return {
+        "conversation_id": conversation_id,
+        "answer": result["answer"],
+        "steps": result["steps"],
+        "usage": result["usage"],
+        "tokens_remaining": remaining,
+    }
+
+
+@router.post("/itinerary", response_model=AgentOut)
+def itinerary(data: AgentIn, user: dict = Depends(get_current_user), conn=Depends(get_conn)):
+    """Agente planificador: busca actividades, consulta clima y distancias,
+    calcula costos y arma el itinerario."""
+    return run_agent_service(
+        conn, user, "itinerary_planner", data.message, data.message, agents.planner_prompt()
+    )
+
+
+@router.post("/adjust-plan", response_model=AgentOut)
+def adjust_plan(data: AdjustIn, user: dict = Depends(get_current_user), conn=Depends(get_conn)):
+    """Agente ajustador: recibe un plan y un cambio (presupuesto o clima),
+    busca alternativas y reajusta las actividades."""
+    user_text = f"CAMBIO SOLICITADO:\n{data.change}\n\nPLAN ACTUAL:\n{data.plan}"
+    return run_agent_service(
+        conn, user, "plan_adjuster", data.change, user_text, agents.adjuster_prompt()
+    )
