@@ -1,0 +1,353 @@
+{
+  "info": {
+    "name": "Turismo GT API",
+    "description": "Colección de demostración del consumo externo de la API REST de Turismo GT. Orden sugerido: 1) Registrar y Login turista, 2) Servicios de IA, 3) Historial y consumo, 4) Seguridad (403 con usuario normal), 5) Login administrador, 6) Administración, 7) Reportes con API key.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "base_url", "value": "https://turismo-gt.onrender.com" },
+    { "key": "admin_email", "value": "admin@turismo.gt" },
+    { "key": "admin_password", "value": "CAMBIA_ESTO" },
+    { "key": "user_email", "value": "turista.postman@correo.com" },
+    { "key": "user_password", "value": "Clave12345" },
+    { "key": "token", "value": "" },
+    { "key": "api_key", "value": "" },
+    { "key": "conversation_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Autenticación",
+      "item": [
+        {
+          "name": "Registrar turista",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Registro (201) o ya existía (409)', () => pm.expect([201, 409]).to.include(pm.response.code));"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"full_name\": \"Turista Postman\",\n  \"password\": \"{{user_password}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] }
+          }
+        },
+        {
+          "name": "Login turista",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Login correcto (200)', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json();",
+            "pm.test('Rol user', () => pm.expect(d.user.role).to.eql('user'));",
+            "pm.collectionVariables.set('token', d.access_token);"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "urlencoded", "urlencoded": [
+              { "key": "username", "value": "{{user_email}}", "type": "text" },
+              { "key": "password", "value": "{{user_password}}", "type": "text" }
+            ] },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Login administrador",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Login correcto (200)', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json();",
+            "pm.test('Rol admin', () => pm.expect(d.user.role).to.eql('admin'));",
+            "pm.collectionVariables.set('token', d.access_token);"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "urlencoded", "urlencoded": [
+              { "key": "username", "value": "{{admin_email}}", "type": "text" },
+              { "key": "password", "value": "{{admin_password}}", "type": "text" }
+            ] },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Mi perfil",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('Trae rol y límite de tokens', () => { const d = pm.response.json(); pm.expect(d).to.have.property('role'); pm.expect(d).to.have.property('token_limit'); });"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/auth/me", "host": ["{{base_url}}"], "path": ["auth", "me"] } }
+        },
+        {
+          "name": "Comprobar rol de administrador",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 si es admin, 403 si es usuario normal', () => pm.expect([200, 403]).to.include(pm.response.code));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/auth/admin-check", "host": ["{{base_url}}"], "path": ["auth", "admin-check"] } }
+        },
+        {
+          "name": "Cerrar sesión",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": { "method": "POST", "header": [], "url": { "raw": "{{base_url}}/auth/logout", "host": ["{{base_url}}"], "path": ["auth", "logout"] } }
+        }
+      ]
+    },
+    {
+      "name": "2. Servicios de IA",
+      "item": [
+        {
+          "name": "Chatbot RAG",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json();",
+            "pm.test('Responde con fuentes', () => { pm.expect(d.sufficient_info).to.eql(true); pm.expect(d.sources.length).to.be.above(0); });",
+            "pm.test('Informa el saldo de tokens', () => pm.expect(d.tokens_remaining).to.be.a('number'));",
+            "pm.collectionVariables.set('conversation_id', d.conversation_id);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"message\": \"¿Qué puedo hacer en el Lago de Atitlán?\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/ai/chat", "host": ["{{base_url}}"], "path": ["ai", "chat"] }
+          }
+        },
+        {
+          "name": "Chatbot RAG - pregunta de seguimiento (memoria)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json();",
+            "pm.test('Continúa la misma conversación', () => pm.expect(d.conversation_id).to.eql(Number(pm.collectionVariables.get('conversation_id'))));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"message\": \"¿Y cuánto cuesta el paseo en lancha?\",\n  \"conversation_id\": {{conversation_id}}\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/ai/chat", "host": ["{{base_url}}"], "path": ["ai", "chat"] }
+          }
+        },
+        {
+          "name": "Chatbot RAG - sin información suficiente",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json();",
+            "pm.test('Indica que no hay información suficiente', () => { pm.expect(d.sufficient_info).to.eql(false); pm.expect(d.sources.length).to.eql(0); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"message\": \"¿Qué hoteles recomiendas en Flores, Petén?\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/ai/chat", "host": ["{{base_url}}"], "path": ["ai", "chat"] }
+          }
+        },
+        {
+          "name": "Agente planificador de itinerarios",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json();",
+            "pm.test('Devuelve el itinerario', () => pm.expect(d.answer.length).to.be.above(50));",
+            "pm.test('Devuelve los pasos del agente', () => pm.expect(d.steps.length).to.be.above(0));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"message\": \"Quiero un viaje de 2 días por el Lago de Atitlán con un presupuesto de Q300 por persona. Me gustan la cultura y la naturaleza.\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/ai/itinerary", "host": ["{{base_url}}"], "path": ["ai", "itinerary"] }
+          }
+        },
+        {
+          "name": "Agente ajustador de plan",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json();",
+            "pm.test('Devuelve el plan ajustado', () => pm.expect(d.answer.length).to.be.above(50));",
+            "pm.test('Devuelve los pasos del agente', () => pm.expect(d.steps.length).to.be.above(0));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"plan\": \"Día 1: Paseo en lancha entre pueblos (Q100, 5 h) y Cooperativa de tejidos en San Juan (Q30, 2 h). Día 2: Kayak al amanecer (Q120, 3 h) en el Lago de Atitlán. Total: Q250 por persona.\",\n  \"change\": \"El presupuesto bajó a Q150 por persona\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/ai/adjust-plan", "host": ["{{base_url}}"], "path": ["ai", "adjust-plan"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Historial y consumo",
+      "item": [
+        {
+          "name": "Mis conversaciones",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('Es una lista', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/history/conversations", "host": ["{{base_url}}"], "path": ["history", "conversations"] } }
+        },
+        {
+          "name": "Detalle de una conversación",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('Trae los mensajes', () => pm.expect(pm.response.json().messages.length).to.be.above(1));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/history/conversations/{{conversation_id}}", "host": ["{{base_url}}"], "path": ["history", "conversations", "{{conversation_id}}"] } }
+        },
+        {
+          "name": "Mi consumo de tokens",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "const d = pm.response.json();",
+            "pm.test('Trae límite, usados y disponibles', () => { pm.expect(d).to.have.property('token_limit'); pm.expect(d).to.have.property('tokens_used'); pm.expect(d).to.have.property('tokens_remaining'); });",
+            "pm.test('Trae el consumo por servicio', () => pm.expect(d.by_service).to.be.an('array'));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/usage/me", "host": ["{{base_url}}"], "path": ["usage", "me"] } }
+        },
+        {
+          "name": "Mis consultas (detalle)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('Es una lista', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/usage/me/records", "host": ["{{base_url}}"], "path": ["usage", "me", "records"] } }
+        }
+      ]
+    },
+    {
+      "name": "4. Administración (token de administrador)",
+      "item": [
+        {
+          "name": "Listar usuarios",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 (requiere Login administrador)', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/admin/users", "host": ["{{base_url}}"], "path": ["admin", "users"] } }
+        },
+        {
+          "name": "Uso general con filtros",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 (requiere Login administrador)', () => pm.response.to.have.status(200));",
+            "pm.test('Es una lista', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/usage?service=rag_chat&date_from=2026-11-01",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "usage"],
+              "query": [
+                { "key": "service", "value": "rag_chat" },
+                { "key": "date_from", "value": "2026-11-01" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear API key de solo lectura",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201', () => pm.response.to.have.status(201));",
+            "const d = pm.response.json();",
+            "pm.test('La llave empieza con tgt_', () => pm.expect(d.api_key).to.match(/^tgt_/));",
+            "pm.collectionVariables.set('api_key', d.api_key);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{base_url}}/admin/api-keys", "host": ["{{base_url}}"], "path": ["admin", "api-keys"] }
+          }
+        },
+        {
+          "name": "Listar API keys",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('No muestra el valor de las llaves', () => pm.response.json().forEach(k => pm.expect(k).to.not.have.property('api_key')));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/admin/api-keys", "host": ["{{base_url}}"], "path": ["admin", "api-keys"] } }
+        }
+      ]
+    },
+    {
+      "name": "5. Reportes con API key (como Power BI)",
+      "item": [
+        {
+          "name": "Resumen por servicio",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('Consultas y tokens por servicio', () => pm.response.json().forEach(s => { pm.expect(s).to.have.property('queries'); pm.expect(s).to.have.property('total_tokens'); }));"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [{ "key": "X-API-Key", "value": "{{api_key}}" }],
+            "url": { "raw": "{{base_url}}/reports/summary", "host": ["{{base_url}}"], "path": ["reports", "summary"] }
+          }
+        },
+        {
+          "name": "Uso por día, servicio y usuario",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('Es una lista plana', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [{ "key": "X-API-Key", "value": "{{api_key}}" }],
+            "url": {
+              "raw": "{{base_url}}/reports/usage?date_from=2026-11-01",
+              "host": ["{{base_url}}"],
+              "path": ["reports", "usage"],
+              "query": [{ "key": "date_from", "value": "2026-11-01" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Seguridad (respuestas de error esperadas)",
+      "item": [
+        {
+          "name": "Sin token da 401",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401 sin autenticación', () => pm.response.to.have.status(401));"
+          ] } }],
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "header": [], "url": { "raw": "{{base_url}}/auth/me", "host": ["{{base_url}}"], "path": ["auth", "me"] } }
+        },
+        {
+          "name": "Usuario normal en endpoint de administrador da 403 (ejecutar tras Login turista)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403 sin permisos', () => pm.response.to.have.status(403));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{base_url}}/admin/users", "host": ["{{base_url}}"], "path": ["admin", "users"] } }
+        },
+        {
+          "name": "API key no sirve en endpoints de administrador (401)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401: la API key solo sirve en /reports/*', () => pm.response.to.have.status(401));"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [{ "key": "X-API-Key", "value": "{{api_key}}" }],
+            "url": { "raw": "{{base_url}}/admin/users", "host": ["{{base_url}}"], "path": ["admin", "users"] }
+          }
+        },
+        {
+          "name": "API key inválida da 401",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401 con llave inválida', () => pm.response.to.have.status(401));"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [{ "key": "X-API-Key", "value": "tgt_llave_invalida" }],
+            "url": { "raw": "{{base_url}}/reports/usage", "host": ["{{base_url}}"], "path": ["reports", "usage"] }
+          }
+        }
+      ]
+    }
+  ]
+}
