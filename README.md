@@ -272,6 +272,6 @@ Si una prueba falla, el job `deploy` se omite y no se publica nada. Para que est
 | `429` | El usuario alcanzó su límite de tokens: el administrador puede ampliarlo o reiniciar el consumo |
 | `pytest` falla al iniciar con un error de `TEST_DATABASE_URL` | Falta la variable, o es igual a `DATABASE_URL` |
 
-## Autores
+## Autor
 
-- NOMBRE DEL INTEGRANTE: Universidad Mesoamericana, Campus Quetzaltenango · Programación Comercial
+- Bryan Alexander Pérez Santos · Universidad Mesoamericana, Campus Quetzaltenango · Programación Comercial
